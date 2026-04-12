@@ -1,0 +1,97 @@
+{
+  "name": "react-native-ndt7-js",
+  "version": "0.1.1",
+  "description": "JavaScript-first NDT7 client for React Native and React Native Web.",
+  "main": "./lib/module/index.js",
+  "module": "./lib/module/index.js",
+  "types": "./lib/typescript/src/index.d.ts",
+  "exports": {
+    ".": {
+      "source": "./src/index.ts",
+      "types": "./lib/typescript/src/index.d.ts",
+      "import": {
+        "default": "./lib/module/index.js"
+      },
+      "default": "./lib/module/index.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "src",
+    "lib",
+    "README.md",
+    "LICENSE",
+    "babel.config.js",
+    "tsconfig.json",
+    "tsconfig.build.json",
+    "!**/__tests__",
+    "!**/__fixtures__",
+    "!**/__mocks__",
+    "!**/.*"
+  ],
+  "scripts": {
+    "build": "bob build",
+    "clean": "rm -rf lib",
+    "lint": "tsc --noEmit",
+    "prepare": "yarn build",
+    "prepublishOnly": "yarn test && yarn typecheck && yarn build",
+    "test": "vitest run tests",
+    "test:watch": "vitest tests",
+    "typecheck": "tsc --noEmit"
+  },
+  "sideEffects": false,
+  "react-native-builder-bob": {
+    "source": "src",
+    "output": "lib",
+    "targets": [
+      [
+        "module",
+        {
+          "esm": true,
+          "sourcemap": false
+        }
+      ],
+      [
+        "typescript",
+        {
+          "project": "tsconfig.build.json"
+        }
+      ]
+    ]
+  },
+  "keywords": [
+    "react-native",
+    "react-native-web",
+    "ndt7",
+    "network-speed",
+    "internet-speed"
+  ],
+  "repository": {
+    "type": "git"
+  },
+  "license": "MIT",
+  "author": "Olasunkanmi IDRIS <olasunkanmiidris15@gmail.com>",
+  "packageManager": "yarn@1.22.22",
+  "publishConfig": {
+    "access": "public"
+  },
+  "peerDependencies": {
+    "react": ">=18.2.0",
+    "react-native": ">=0.79.0"
+  },
+  "dependencies": {
+    "@m-lab/ndt7": "0.1.4"
+  },
+  "devDependencies": {
+    "@babel/core": "^7.26.0",
+    "@types/react": "^19.0.10",
+    "react": "19.0.0",
+    "react-native": "0.79.5",
+    "react-native-builder-bob": "^0.36.0",
+    "typescript": "~5.8.3",
+    "vitest": "^4.1.4"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
