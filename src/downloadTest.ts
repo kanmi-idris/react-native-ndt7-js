@@ -4,6 +4,30 @@ type DownloadCallbacks = {
   onProgress: (event: Ndt7ProgressEvent) => void;
 };
 
+function getNow() {
+  if (typeof performance !== 'undefined' && typeof performance.now === 'function') {
+    return () => performance.now();
+  }
+
+  return () => Date.now();
+}
+
+function getMessageSize(data: string | Blob | ArrayBuffer) {
+  if (typeof data === 'string') {
+    return data.length;
+  }
+
+  if (data instanceof ArrayBuffer) {
+    return data.byteLength;
+  }
+
+  if ('size' in data && typeof data.size === 'number') {
+    return data.size;
+  }
+
+  return 0;
+}
+
 export function runDownloadTest(urls: Record<string, string>, callbacks: DownloadCallbacks) {
   return new Promise<{ speedMbps: number }>((resolve, reject) => {
     const url = urls['///ndt/v7/download'];
@@ -13,22 +37,42 @@ export function runDownloadTest(urls: Record<string, string>, callbacks: Downloa
     }
 
     const socket = new WebSocket(url, 'net.measurementlab.ndt.v7');
-    const startedAt = Date.now();
+    const now = getNow();
+    let startedAt = now();
     let lastMeasureAt = startedAt;
     let totalBytes = 0;
     let latestSpeed = 0;
+    let settled = false;
 
-    socket.onerror = () => reject(new Error('download socket error'));
+    const settleResolve = () => {
+      if (settled) {
+        return;
+      }
+      settled = true;
+      resolve({ speedMbps: latestSpeed });
+    };
+
+    const settleReject = () => {
+      if (settled) {
+        return;
+      }
+      settled = true;
+      reject(new Error('download socket error'));
+    };
+
+    socket.onerror = () => settleReject();
+    socket.onopen = () => {
+      startedAt = now();
+      lastMeasureAt = startedAt;
+      totalBytes = 0;
+      latestSpeed = 0;
+    };
     socket.onmessage = (event: MessageEvent<string | Blob | ArrayBuffer>) => {
-      const size = typeof event.data === 'string'
-        ? event.data.length
-        : 'size' in event.data
-          ? event.data.size
-          : event.data.byteLength;
+      const size = getMessageSize(event.data);
       totalBytes += size;
-      const now = Date.now();
-      if (now - lastMeasureAt >= 250) {
-        const elapsedMs = now - startedAt;
+      const timestamp = now();
+      if (timestamp - lastMeasureAt > 250) {
+        const elapsedMs = timestamp - startedAt;
         latestSpeed = elapsedMs > 0 ? (totalBytes / elapsedMs) * 0.008 : 0;
         callbacks.onProgress({
           phase: 'download',
@@ -36,9 +80,9 @@ export function runDownloadTest(urls: Record<string, string>, callbacks: Downloa
           elapsedMs,
           bytesTransferred: totalBytes,
         });
-        lastMeasureAt = now;
+        lastMeasureAt = timestamp;
       }
     };
-    socket.onclose = () => resolve({ speedMbps: latestSpeed });
+    socket.onclose = () => settleResolve();
   });
 }
