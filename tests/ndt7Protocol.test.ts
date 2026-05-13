@@ -38,4 +38,24 @@ describe('Ndt7Protocol', () => {
     expect(protocol.calculateMbps(1_000_000, 1000)).toBe(8);
     expect(protocol.calculateMbps(1_000_000, 0)).toBe(0);
   });
+
+  it('parses server measurements and derives TCP timing metrics', () => {
+    const protocol = new Ndt7Protocol();
+    const measurement = protocol.parseServerMeasurement(
+      JSON.stringify({
+        TCPInfo: {
+          RTT: 2500,
+          RTTVar: 700,
+          MinRTT: 1200,
+        },
+      })
+    );
+
+    expect(protocol.getServerMetrics(measurement)).toEqual({
+      latencyMs: 2.5,
+      jitterMs: 0.7,
+      minRttMs: 1.2,
+    });
+    expect(protocol.parseServerMeasurement('{not-json')).toBeNull();
+  });
 });

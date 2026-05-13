@@ -1,4 +1,8 @@
-import type { Ndt7Protocol, Ndt7ServerURLs } from "./ndt7Protocol";
+import type {
+  Ndt7Protocol,
+  Ndt7ServerMetrics,
+  Ndt7ServerURLs,
+} from "./ndt7Protocol";
 import { runNdt7WebSocketPhase } from "./ndt7WebSocketPhase";
 import type { Ndt7ProgressEvent } from "./types";
 
@@ -6,10 +10,20 @@ type UploadCallbacks = {
   onProgress: (event: Ndt7ProgressEvent) => void;
 };
 
+type UploadMeasurement = {
+  speedMbps: number;
+  elapsedMs: number;
+  bytesTransferred: number;
+  metrics?: Ndt7ServerMetrics;
+};
+
 class UploadTestRunner {
   private readonly currentTime = () => this.ndt7Protocol.now();
   private readonly maxMessageSize = 8 * 1024 * 1024; // 8MiB
+  private readonly maxFallbackQueueSize = 16 * 1024 * 1024; // 16MiB
   private latestSpeed = 0;
+  private latestServerMeasurement: UploadMeasurement | null = null;
+  private latestMetrics: Ndt7ServerMetrics = {};
   private closed = false;
   private data = new Uint8Array(8192); // 8KiB
   private total = 0; // total bytes sent
@@ -27,20 +41,22 @@ class UploadTestRunner {
   ) {}
 
   getResult() {
-    return { speedMbps: this.latestSpeed };
+    return Object.keys(this.latestMetrics).length > 0
+      ? { speedMbps: this.latestSpeed, metrics: this.latestMetrics }
+      : { speedMbps: this.latestSpeed };
   }
 
   /**
    * Attaches the upload test runner to a WebSocket connection.
    */
-  attach(socket: WebSocket, isSettled: () => boolean) {
+  attach(socket: WebSocket, isSettled: () => boolean, markOpen: () => void) {
     this.socket = socket;
     this.isSettled = isSettled;
-    this.socket.onmessage = () => {
-      // Upstream worker forwards server messages, but controller currently
-      // exposes only normalized progress events, so no action is needed here.
+    this.socket.onmessage = (event) => {
+      this.handleServerMessage(event.data);
     };
     this.socket.onopen = () => {
+      markOpen();
       this.start = this.currentTime();
       /** Upload runs for a fixed measurement window. */
       this.end = this.start + 10000;
@@ -57,15 +73,7 @@ class UploadTestRunner {
       return;
     }
 
-    const numBytes = this.total - this.getBufferedAmount();
-    const elapsedMs = this.currentTime() - this.start;
-    this.latestSpeed = this.ndt7Protocol.calculateMbps(numBytes, elapsedMs);
-    this.callbacks.onProgress({
-      phase: "upload",
-      speedMbps: this.latestSpeed,
-      elapsedMs,
-      bytesTransferred: numBytes,
-    });
+    this.emitMeasurement(this.getBestMeasurement());
   }
 
   /**
@@ -87,19 +95,21 @@ class UploadTestRunner {
     }
 
     /** Grow payloads only after enough bytes have drained to avoid runaway buffering. */
+    const bufferedAmount = this.getBufferedAmount();
+    const drainedBytes = this.getDrainedBytes(bufferedAmount);
     const nextSizeIncrement =
       this.data.length >= this.maxMessageSize
         ? Infinity
         : 16 * this.data.length;
-    if (this.total - this.getBufferedAmount() >= nextSizeIncrement) {
+    if (drainedBytes >= nextSizeIncrement) {
       this.data = new Uint8Array(
         Math.min(this.data.length * 2, this.maxMessageSize),
       );
     }
 
     /** Keep the socket fed, but cap queued data so progress still reflects network drain. */
-    const desiredBuffer = 7 * this.data.length;
-    if (this.getBufferedAmount() < desiredBuffer) {
+    const desiredBuffer = this.getDesiredBuffer(bufferedAmount);
+    if (this.getQueuedBytes(bufferedAmount) < desiredBuffer) {
       this.socket.send(this.data);
       this.total += this.data.length;
     }
@@ -115,14 +125,130 @@ class UploadTestRunner {
   }
 
   /**
-   * Some React Native WebSocket runtimes do not expose a reliable bufferedAmount.
+   * React Native may omit bufferedAmount, so callers must handle no queue signal.
    */
   private getBufferedAmount() {
     if (!this.socket || !Number.isFinite(this.socket.bufferedAmount)) {
-      return 0;
+      return null;
     }
 
     return Math.max(0, this.socket.bufferedAmount);
+  }
+
+  /**
+   * Server AppInfo gives received-byte counts when React Native cannot expose bufferedAmount.
+   */
+  private handleServerMessage(data: unknown) {
+    const serverMeasurement = this.ndt7Protocol.parseServerMeasurement(data);
+    if (!serverMeasurement) {
+      return;
+    }
+
+    this.latestMetrics = this.ndt7Protocol.getServerMetrics(serverMeasurement);
+    const measurement = this.parseServerMeasurement(serverMeasurement);
+    if (!measurement) {
+      return;
+    }
+
+    this.latestServerMeasurement = measurement;
+    this.emitMeasurement(measurement);
+  }
+
+  private parseServerMeasurement(message: Record<string, unknown>): UploadMeasurement | null {
+    const appInfo = message.AppInfo;
+    if (!UploadTestRunner.isRecord(appInfo)) {
+      return null;
+    }
+
+    const bytesTransferred = appInfo.NumBytes;
+    const elapsedMicroseconds = appInfo.ElapsedTime;
+    if (
+      !UploadTestRunner.isFiniteNumber(bytesTransferred) ||
+      !UploadTestRunner.isFiniteNumber(elapsedMicroseconds) ||
+      bytesTransferred < 0 ||
+      elapsedMicroseconds <= 0
+    ) {
+      return null;
+    }
+
+    const elapsedMs = elapsedMicroseconds / 1000;
+    return {
+      speedMbps: this.ndt7Protocol.calculateMbps(bytesTransferred, elapsedMs),
+      elapsedMs,
+      bytesTransferred,
+      metrics: this.latestMetrics,
+    };
+  }
+
+  /**
+   * Prefer server truth, then fall back to local accounting so completion never emits NaN.
+   */
+  private getBestMeasurement(): UploadMeasurement {
+    if (this.latestServerMeasurement) {
+      return this.latestServerMeasurement;
+    }
+
+    const bufferedAmount = this.getBufferedAmount();
+    const bytesTransferred =
+      bufferedAmount === null
+        ? this.total
+        : Math.max(0, Math.min(this.total, this.total - bufferedAmount));
+    const elapsedMs = this.currentTime() - this.start;
+
+    return {
+      speedMbps: this.ndt7Protocol.calculateMbps(bytesTransferred, elapsedMs),
+      elapsedMs,
+      bytesTransferred,
+      metrics: this.latestMetrics,
+    };
+  }
+
+  private emitMeasurement(measurement: UploadMeasurement) {
+    this.latestSpeed = measurement.speedMbps;
+    this.callbacks.onProgress({
+      phase: "upload",
+      speedMbps: measurement.speedMbps,
+      elapsedMs: measurement.elapsedMs,
+      bytesTransferred: measurement.bytesTransferred,
+      ...measurement.metrics,
+    });
+  }
+
+  private getDrainedBytes(bufferedAmount: number | null) {
+    if (bufferedAmount !== null) {
+      return Math.max(0, Math.min(this.total, this.total - bufferedAmount));
+    }
+
+    return this.latestServerMeasurement?.bytesTransferred ?? 0;
+  }
+
+  private getQueuedBytes(bufferedAmount: number | null) {
+    if (bufferedAmount !== null) {
+      return bufferedAmount;
+    }
+
+    return Math.max(
+      0,
+      this.total - (this.latestServerMeasurement?.bytesTransferred ?? 0),
+    );
+  }
+
+  private getDesiredBuffer(bufferedAmount: number | null) {
+    const desiredBuffer = 7 * this.data.length;
+
+    if (bufferedAmount !== null) {
+      return desiredBuffer;
+    }
+
+    return Math.min(desiredBuffer, this.maxFallbackQueueSize);
+  }
+
+  private static isRecord(value: unknown): value is Record<string, unknown> {
+    return typeof value === "object" && value !== null;
+  }
+
+  private static isFiniteNumber(value: unknown): value is number {
+    return typeof value === "number" && Number.isFinite(value);
   }
 }
 
@@ -145,8 +271,8 @@ export function runUploadTest(
     missingURLMessage: "Missing NDT7 upload URL",
     socketErrorMessage: "upload socket error",
     getResult: () => runner.getResult(),
-    run: ({ socket, isSettled }) => {
-      runner.attach(socket, isSettled);
+    run: ({ socket, isSettled, markOpen }) => {
+      runner.attach(socket, isSettled, markOpen);
     },
   });
 }

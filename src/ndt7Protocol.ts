@@ -3,6 +3,12 @@ type Ndt7Endpoint = "download" | "upload";
 export type Ndt7ServerURLs = Record<string, string>;
 type Clock = () => number;
 
+export type Ndt7ServerMetrics = {
+  latencyMs?: number;
+  jitterMs?: number;
+  minRttMs?: number;
+};
+
 type Ndt7ProtocolOptions = {
   protocol?: Ndt7NetworkProtocol;
   now?: Clock;
@@ -108,6 +114,56 @@ export class Ndt7Protocol {
   }
 
   /**
+   * NDT7 server telemetry arrives as JSON string frames; binary frames are test payload.
+   */
+  parseServerMeasurement(data: unknown): Record<string, unknown> | null {
+    if (typeof data !== "string") {
+      return null;
+    }
+
+    let message: unknown;
+    try {
+      message = JSON.parse(data);
+    } catch {
+      return null;
+    }
+
+    return Ndt7Protocol.isRecord(message) ? message : null;
+  }
+
+  /**
+   * Kernel TCPInfo/BBRInfo timings are reported in microseconds by ndt-server.
+   */
+  getServerMetrics(measurement: Record<string, unknown> | null): Ndt7ServerMetrics {
+    if (!measurement) {
+      return {};
+    }
+
+    const tcpInfo = Ndt7Protocol.getRecord(measurement, "TCPInfo");
+    const bbrInfo = Ndt7Protocol.getRecord(measurement, "BBRInfo");
+    const metrics: Ndt7ServerMetrics = {};
+
+    const rtt = Ndt7Protocol.getFiniteNumber(tcpInfo, "RTT");
+    if (rtt !== undefined) {
+      metrics.latencyMs = Ndt7Protocol.microsecondsToMilliseconds(rtt);
+    }
+
+    const rttVar = Ndt7Protocol.getFiniteNumber(tcpInfo, "RTTVar");
+    if (rttVar !== undefined) {
+      metrics.jitterMs = Ndt7Protocol.microsecondsToMilliseconds(rttVar);
+    }
+
+    const minRtt =
+      Ndt7Protocol.getFiniteNumber(tcpInfo, "MinRTT") ??
+      Ndt7Protocol.getFiniteNumber(bbrInfo, "MinRTT");
+    if (minRtt !== undefined) {
+      metrics.minRttMs = Ndt7Protocol.microsecondsToMilliseconds(minRtt);
+    }
+
+    return metrics;
+  }
+
+  /**
    * Calculate bits per second from bytes transferred and elapsed time in milliseconds
    * 8 bits per byte.
    * 1000000 bits per megabit.
@@ -117,5 +173,37 @@ export class Ndt7Protocol {
    */
   calculateMbps(bytes: number, elapsedMs: number): number {
     return elapsedMs > 0 ? (bytes * 8) / 1000000 / (elapsedMs / 1000) : 0;
+  }
+
+  private static isRecord(value: unknown): value is Record<string, unknown> {
+    return typeof value === "object" && value !== null;
+  }
+
+  private static getRecord(
+    source: Record<string, unknown>,
+    key: string,
+  ): Record<string, unknown> | null {
+    const value = source[key];
+
+    return Ndt7Protocol.isRecord(value) ? value : null;
+  }
+
+  private static getFiniteNumber(
+    source: Record<string, unknown> | null,
+    key: string,
+  ): number | undefined {
+    if (!source) {
+      return undefined;
+    }
+
+    const value = source[key];
+
+    return typeof value === "number" && Number.isFinite(value) && value >= 0
+      ? value
+      : undefined;
+  }
+
+  private static microsecondsToMilliseconds(value: number): number {
+    return value / 1000;
   }
 }

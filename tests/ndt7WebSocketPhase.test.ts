@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { runNdt7WebSocketPhase } from '../src/ndt7WebSocketPhase';
 
@@ -7,6 +7,7 @@ class MockWebSocket {
 
   onclose: (() => void) | null = null;
   onerror: (() => void) | null = null;
+  onopen: (() => void) | null = null;
 
   constructor(
     readonly url: string,
@@ -17,6 +18,12 @@ class MockWebSocket {
 }
 
 describe('runNdt7WebSocketPhase', () => {
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.unstubAllGlobals();
+    MockWebSocket.instances = [];
+  });
+
   it('rejects before socket creation when the phase URL is missing', async () => {
     const run = vi.fn();
 
@@ -73,5 +80,52 @@ describe('runNdt7WebSocketPhase', () => {
     MockWebSocket.instances[0]?.onclose?.();
 
     await expect(resultPromise).rejects.toThrow('socket failed');
+  });
+
+  it('rejects when the socket never opens', async () => {
+    vi.useFakeTimers();
+    vi.stubGlobal('WebSocket', MockWebSocket);
+
+    const resultPromise = runNdt7WebSocketPhase({
+      url: 'wss://example.test/ndt/v7/download',
+      websocketProtocol: 'test-protocol',
+      missingURLMessage: 'missing url',
+      socketErrorMessage: 'socket failed',
+      connectionTimeoutMessage: 'connection timed out',
+      connectionTimeoutMs: 5,
+      getResult: () => ({ speedMbps: 0 }),
+      run: () => {},
+    });
+
+    const rejection = expect(resultPromise).rejects.toThrow('connection timed out');
+    await vi.advanceTimersByTimeAsync(5);
+
+    await rejection;
+  });
+
+  it('resolves with the latest result when an opened phase times out', async () => {
+    vi.useFakeTimers();
+    vi.stubGlobal('WebSocket', MockWebSocket);
+    let speedMbps = 0;
+
+    const resultPromise = runNdt7WebSocketPhase({
+      url: 'wss://example.test/ndt/v7/download',
+      websocketProtocol: 'test-protocol',
+      missingURLMessage: 'missing url',
+      socketErrorMessage: 'socket failed',
+      phaseTimeoutMs: 7,
+      getResult: () => ({ speedMbps }),
+      run: ({ socket, markOpen }) => {
+        socket.onopen = () => {
+          markOpen();
+          speedMbps = 42;
+        };
+      },
+    });
+
+    MockWebSocket.instances[0]?.onopen?.();
+    await vi.advanceTimersByTimeAsync(7);
+
+    await expect(resultPromise).resolves.toEqual({ speedMbps: 42 });
   });
 });
