@@ -57,7 +57,7 @@ class UploadTestRunner {
       return;
     }
 
-    const numBytes = this.total - this.socket.bufferedAmount;
+    const numBytes = this.total - this.getBufferedAmount();
     const elapsedMs = this.currentTime() - this.start;
     this.latestSpeed = this.ndt7Protocol.calculateMbps(numBytes, elapsedMs);
     this.callbacks.onProgress({
@@ -91,7 +91,7 @@ class UploadTestRunner {
       this.data.length >= this.maxMessageSize
         ? Infinity
         : 16 * this.data.length;
-    if (this.total - this.socket.bufferedAmount >= nextSizeIncrement) {
+    if (this.total - this.getBufferedAmount() >= nextSizeIncrement) {
       this.data = new Uint8Array(
         Math.min(this.data.length * 2, this.maxMessageSize),
       );
@@ -99,7 +99,7 @@ class UploadTestRunner {
 
     /** Keep the socket fed, but cap queued data so progress still reflects network drain. */
     const desiredBuffer = 7 * this.data.length;
-    if (this.socket.bufferedAmount < desiredBuffer) {
+    if (this.getBufferedAmount() < desiredBuffer) {
       this.socket.send(this.data);
       this.total += this.data.length;
     }
@@ -112,6 +112,17 @@ class UploadTestRunner {
 
     /** Yield so socket buffering can advance before the next pacing pass. */
     setTimeout(() => this.tick(), 0);
+  }
+
+  /**
+   * Some React Native WebSocket runtimes do not expose a reliable bufferedAmount.
+   */
+  private getBufferedAmount() {
+    if (!this.socket || !Number.isFinite(this.socket.bufferedAmount)) {
+      return 0;
+    }
+
+    return Math.max(0, this.socket.bufferedAmount);
   }
 }
 
