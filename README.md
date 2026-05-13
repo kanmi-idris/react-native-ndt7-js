@@ -61,47 +61,6 @@ completeSub.remove();
 
 If a test is already active, `startSpeedTest()` returns the current state with `alreadyRunning: true`.
 
-## Runtime flow
-
-```text
-+----------------+     schedules      +----------------+
-| Ndt7Controller | -----------------> | runSpeedTest   |
-| state + events |                    | one run        |
-+----------------+                    +----------------+
-        ^                                      |
-        | progress + terminal events           | creates
-        |                                      v
-        |                              +----------------+
-        |                              | Ndt7Protocol   |
-        |                              | endpoint keys  |
-        |                              | timing + Mbps  |
-        |                              +----------------+
-        |                                      |
-        |                                      | shared rules
-        |                                      v
-        |                              +-----------------------+
-        |                              | resolveNdt7ServerURLs |
-        |                              | direct or M-Lab locate |
-        |                              +-----------------------+
-        |                                      |
-        |                                      | download/upload URLs
-        |                                      v
-        |              +----------------+     then      +---------------+
-        |              | runDownloadTest| ------------> | runUploadTest |
-        |              | count received |               | send payloads |
-        |              | bytes          |               | measure drain |
-        |              +----------------+               +---------------+
-        |                       |                               |
-        |                       | uses                          | uses
-        |                       v                               v
-        |              +-----------------------------------------------+
-        |              | runNdt7WebSocketPhase                         |
-        |              | open socket, handle close/error, settle once   |
-        |              +-----------------------------------------------+
-        |                                      |
-        +--------------------------------------+
-```
-
 ## Usage scenarios
 
 ### 1. Minimal fire-and-forget test
