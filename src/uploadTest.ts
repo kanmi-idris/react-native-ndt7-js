@@ -20,7 +20,8 @@ type UploadMeasurement = {
 class UploadTestRunner {
   private readonly currentTime = () => this.ndt7Protocol.now();
   private readonly maxMessageSize = 8 * 1024 * 1024; // 8MiB
-  private readonly maxFallbackQueueSize = 16 * 1024 * 1024; // 16MiB
+  private readonly maxFallbackMessageSize = 256 * 1024; // 256KiB
+  private readonly maxFallbackQueueSize = 64 * 1024 * 1024; // 64MiB
   private latestSpeed = 0;
   private latestServerMeasurement: UploadMeasurement | null = null;
   private latestMetrics: Ndt7ServerMetrics = {};
@@ -77,8 +78,8 @@ class UploadTestRunner {
   }
 
   /**
-   * Payload size grows only after the socket drains enough data; this keeps
-   * the sender aggressive without letting bufferedAmount explode.
+   * Payload size grows from the best available drain signal; browsers use
+   * bufferedAmount, while React Native falls back to a bounded optimistic window.
    */
   private tick() {
     /** Stop scheduling work once the phase has ended or settled elsewhere. */
@@ -94,20 +95,21 @@ class UploadTestRunner {
       return;
     }
 
-    /** Grow payloads only after enough bytes have drained to avoid runaway buffering. */
+    /** Grow payloads from observed drain, or from accepted sends when RN has no queue signal. */
     const bufferedAmount = this.getBufferedAmount();
     const drainedBytes = this.getDrainedBytes(bufferedAmount);
+    const maxMessageSize = this.getMaxMessageSize(bufferedAmount);
     const nextSizeIncrement =
-      this.data.length >= this.maxMessageSize
+      this.data.length >= maxMessageSize
         ? Infinity
         : 16 * this.data.length;
     if (drainedBytes >= nextSizeIncrement) {
       this.data = new Uint8Array(
-        Math.min(this.data.length * 2, this.maxMessageSize),
+        Math.min(this.data.length * 2, maxMessageSize),
       );
     }
 
-    /** Keep the socket fed, but cap queued data so progress still reflects network drain. */
+    /** Keep the socket fed; RN's no-bufferedAmount path uses a wider bounded window. */
     const desiredBuffer = this.getDesiredBuffer(bufferedAmount);
     if (this.getQueuedBytes(bufferedAmount) < desiredBuffer) {
       this.socket.send(this.data);
@@ -219,7 +221,7 @@ class UploadTestRunner {
       return Math.max(0, Math.min(this.total, this.total - bufferedAmount));
     }
 
-    return this.latestServerMeasurement?.bytesTransferred ?? 0;
+    return this.latestServerMeasurement?.bytesTransferred ?? this.total;
   }
 
   private getQueuedBytes(bufferedAmount: number | null) {
@@ -234,13 +236,17 @@ class UploadTestRunner {
   }
 
   private getDesiredBuffer(bufferedAmount: number | null) {
-    const desiredBuffer = 7 * this.data.length;
-
     if (bufferedAmount !== null) {
-      return desiredBuffer;
+      return 7 * this.data.length;
     }
 
-    return Math.min(desiredBuffer, this.maxFallbackQueueSize);
+    return this.maxFallbackQueueSize;
+  }
+
+  private getMaxMessageSize(bufferedAmount: number | null) {
+    return bufferedAmount !== null
+      ? this.maxMessageSize
+      : this.maxFallbackMessageSize;
   }
 
   private static isRecord(value: unknown): value is Record<string, unknown> {

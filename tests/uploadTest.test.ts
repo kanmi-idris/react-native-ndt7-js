@@ -121,6 +121,38 @@ describe('runUploadTest', () => {
     expect(Number.isNaN(onProgress.mock.calls.at(-1)?.[0].speedMbps)).toBe(false);
   });
 
+  it('keeps uploading when bufferedAmount is unavailable and server measurements are sparse', async () => {
+    vi.useFakeTimers();
+    vi.stubGlobal('WebSocket', MockWebSocketWithoutBufferedAmount);
+    let currentTime = 0;
+    const onProgress = vi.fn();
+    const protocol = new Ndt7Protocol({
+      now: () => currentTime,
+      progressIntervalMs: 1,
+    });
+    const urls = protocol.buildServerURLs(
+      'wss://example.test/ndt/v7/download',
+      'wss://example.test/ndt/v7/upload'
+    );
+
+    const resultPromise = runUploadTest(urls, protocol, { onProgress });
+    const socket = MockWebSocketWithoutBufferedAmount.instances[0];
+
+    socket?.onopen?.();
+    for (let i = 0; i < 20; i += 1) {
+      currentTime += 1;
+      await vi.runOnlyPendingTimersAsync();
+    }
+
+    expect(socket?.sentBytes).toBeGreaterThan(7 * 8192);
+
+    currentTime = 10_000;
+    await vi.runOnlyPendingTimersAsync();
+
+    const result = await resultPromise;
+    expect(result.speedMbps).toBeGreaterThan(0.05);
+  });
+
   it('ignores malformed upload server messages', async () => {
     vi.useFakeTimers();
     vi.stubGlobal('WebSocket', MockWebSocketWithoutBufferedAmount);
