@@ -1,5 +1,5 @@
 {
-  "name": "react-native-ndt7-js",
+  "name": "@_molaidrislabs/react-native-ndt7-js",
   "version": "0.1.1",
   "description": "JavaScript-first NDT7 client for React Native and React Native Web.",
   "main": "./lib/module/index.js",
@@ -34,7 +34,10 @@
     "clean": "rm -rf lib",
     "lint": "tsc --noEmit",
     "prepare": "yarn build",
-    "prepublishOnly": "yarn test && yarn typecheck && yarn build",
+    "prepack": "yarn clean",
+    "prepublishOnly": "yarn test && yarn typecheck",
+    "pack:dry-run": "npm pack --dry-run",
+    "release:check": "yarn test && yarn typecheck && yarn pack:dry-run",
     "test": "vitest run tests",
     "test:watch": "vitest tests",
     "typecheck": "tsc --noEmit"
@@ -67,12 +70,18 @@
     "internet-speed"
   ],
   "repository": {
-    "type": "git"
+    "type": "git",
+    "url": "git+https://github.com/kanmi-idris/react-native-ndt7-js.git"
+  },
+  "homepage": "https://github.com/kanmi-idris/react-native-ndt7-js#readme",
+  "bugs": {
+    "url": "https://github.com/kanmi-idris/react-native-ndt7-js/issues"
   },
   "license": "MIT",
   "author": "Olasunkanmi IDRIS <olasunkanmiidris15@gmail.com>",
   "packageManager": "yarn@1.22.22",
   "publishConfig": {
+    "registry": "https://registry.npmjs.org/",
     "access": "public"
   },
   "peerDependencies": {

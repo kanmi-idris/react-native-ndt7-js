@@ -7,6 +7,6 @@ export default defineConfig({
     clearMocks: true,
     restoreMocks: true,
     include: ['tests/**/*.test.ts'],
-    exclude: ['example-expo/**', 'example-rn-cli/**', 'lib/**', 'node_modules/**'],
+    exclude: ['lib/**', 'node_modules/**'],
   },
 });

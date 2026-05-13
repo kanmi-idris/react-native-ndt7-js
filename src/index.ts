@@ -14,9 +14,9 @@ export type {
   Ndt7CompleteEvent,
   Ndt7ErrorEvent,
   Ndt7ProgressEvent,
+  Ndt7StartOptions,
   Ndt7StateChangeEvent,
   SpeedTestPhase,
   SpeedTestState,
-  StartSpeedTestOptions,
   StartSpeedTestResult,
 } from './types';

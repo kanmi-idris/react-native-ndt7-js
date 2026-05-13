@@ -8,7 +8,7 @@ export type SpeedTestState =
 
 export type SpeedTestPhase = 'download' | 'upload';
 
-export interface StartSpeedTestOptions {
+export interface Ndt7StartOptions {
   emitProgress?: boolean;
   server?: string;
   protocol?: 'ws' | 'wss';
