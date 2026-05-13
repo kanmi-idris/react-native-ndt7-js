@@ -5,7 +5,7 @@ import {
   useSafeAreaInsets,
 } from 'react-native-safe-area-context';
 
-import { Ndt7, type Ndt7CompleteEvent, type Ndt7ErrorEvent, type Ndt7ProgressEvent, type SpeedTestState } from 'react-native-ndt7-js';
+import { Ndt7, type Ndt7CompleteEvent, type Ndt7ErrorEvent, type Ndt7ProgressEvent, type SpeedTestState } from '@_molaidrislabs/react-native-internet-speed-test';
 
 function App() {
   return (
@@ -42,7 +42,7 @@ function AppContent() {
 
   return (
     <SafeAreaView style={[styles.container, { paddingTop: safeAreaInsets.top + 24 }]}> 
-      <Text style={styles.title}>react-native-ndt7-js / RN CLI</Text>
+      <Text style={styles.title}>@_molaidrislabs/react-native-internet-speed-test / RN CLI</Text>
       <Text style={styles.line}>State: {state}</Text>
       <Text style={styles.line}>Phase: {progress?.phase ?? '-'}</Text>
       <Text style={styles.line}>Speed: {progress?.speedMbps?.toFixed(2) ?? '-'} Mbps</Text>

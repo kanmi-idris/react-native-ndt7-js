@@ -1,4 +1,4 @@
-# @_molaidrislabs/react-native-ndt7-js
+# @_molaidrislabs/react-native-internet-speed-test
 
 JavaScript-first NDT7 client for React Native and React Native Web.
 
@@ -13,11 +13,11 @@ JavaScript-first NDT7 client for React Native and React Native Web.
 ## Installation
 
 ```bash
-npm install @_molaidrislabs/react-native-ndt7-js
+npm install @_molaidrislabs/react-native-internet-speed-test
 ```
 
 ```bash
-yarn add @_molaidrislabs/react-native-ndt7-js
+yarn add @_molaidrislabs/react-native-internet-speed-test
 ```
 
 This package currently pins `@m-lab/ndt7` to the tested upstream version to avoid behavior drift.
@@ -25,7 +25,7 @@ This package currently pins `@m-lab/ndt7` to the tested upstream version to avoi
 ## API
 
 ```ts
-import { Ndt7 } from '@_molaidrislabs/react-native-ndt7-js';
+import { Ndt7 } from '@_molaidrislabs/react-native-internet-speed-test';
 
 const progressSub = Ndt7.addListener('progress', event => {
   console.log(event.phase, event.speedMbps);
@@ -107,7 +107,7 @@ If a test is already active, `startSpeedTest()` returns the current state with `
 ### 1. Minimal fire-and-forget test
 
 ```ts
-import { Ndt7 } from '@_molaidrislabs/react-native-ndt7-js';
+import { Ndt7 } from '@_molaidrislabs/react-native-internet-speed-test';
 
 await Ndt7.startSpeedTest({
   userAcceptedDataPolicy: true,
@@ -117,7 +117,7 @@ await Ndt7.startSpeedTest({
 ### 2. Subscribe to progress and completion
 
 ```ts
-import { Ndt7 } from '@_molaidrislabs/react-native-ndt7-js';
+import { Ndt7 } from '@_molaidrislabs/react-native-internet-speed-test';
 
 const subscriptions = [
   Ndt7.addListener('stateChange', event => {
@@ -143,7 +143,7 @@ subscriptions.forEach(subscription => subscription.remove());
 ### 3. Best-effort cancellation
 
 ```ts
-import { Ndt7 } from '@_molaidrislabs/react-native-ndt7-js';
+import { Ndt7 } from '@_molaidrislabs/react-native-internet-speed-test';
 
 await Ndt7.startSpeedTest({ userAcceptedDataPolicy: true });
 
@@ -157,7 +157,7 @@ setTimeout(() => {
 ### 4. Target a specific server or load balancer
 
 ```ts
-import { Ndt7 } from '@_molaidrislabs/react-native-ndt7-js';
+import { Ndt7 } from '@_molaidrislabs/react-native-internet-speed-test';
 
 await Ndt7.startSpeedTest({
   userAcceptedDataPolicy: true,

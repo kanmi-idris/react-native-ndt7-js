@@ -2,7 +2,7 @@ import { StatusBar } from 'expo-status-bar';
 import { useEffect, useState } from 'react';
 import { SafeAreaView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
-import { Ndt7, type Ndt7CompleteEvent, type Ndt7ErrorEvent, type Ndt7ProgressEvent, type SpeedTestState } from 'react-native-ndt7-js';
+import { Ndt7, type Ndt7CompleteEvent, type Ndt7ErrorEvent, type Ndt7ProgressEvent, type SpeedTestState } from '@_molaidrislabs/react-native-internet-speed-test';
 
 export default function App() {
   const [state, setState] = useState<SpeedTestState>('idle');
@@ -29,7 +29,7 @@ export default function App() {
 
   return (
     <SafeAreaView style={styles.container}>
-      <Text style={styles.title}>react-native-ndt7-js / Expo</Text>
+      <Text style={styles.title}>@_molaidrislabs/react-native-internet-speed-test / Expo</Text>
       <Text style={styles.line}>State: {state}</Text>
       <Text style={styles.line}>Phase: {progress?.phase ?? '-'}</Text>
       <Text style={styles.line}>Speed: {progress?.speedMbps?.toFixed(2) ?? '-'} Mbps</Text>

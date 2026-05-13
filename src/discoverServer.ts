@@ -44,7 +44,7 @@ class Ndt7ServerURLResolver {
     "https://locate.measurementlab.net/v2/nearest/ndt/ndt7";
   private static readonly MLAB_NDT7_PRIORITY_LOCATE_URL =
     "https://locate.measurementlab.net/v2/priority/nearest/ndt/ndt7";
-  private static readonly PACKAGE_NAME = "@_molaidrislabs/react-native-ndt7-js";
+  private static readonly PACKAGE_NAME = "@_molaidrislabs/react-native-internet-speed-test";
   private static readonly PACKAGE_VERSION = "0.1.1";
   private readonly options: Ndt7ServerResolutionOptions;
   private readonly ndt7Protocol: Ndt7Protocol;

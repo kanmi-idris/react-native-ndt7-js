@@ -1,5 +1,5 @@
 {
-  "name": "@_molaidrislabs/react-native-ndt7-js",
+  "name": "@_molaidrislabs/react-native-internet-speed-test",
   "version": "0.1.1",
   "description": "JavaScript-first NDT7 client for React Native and React Native Web.",
   "main": "./lib/module/index.js",

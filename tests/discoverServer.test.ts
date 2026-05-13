@@ -16,7 +16,7 @@ describe('resolveNdt7ServerURLs', () => {
     expect(result['///ndt/v7/upload']).toContain('wss://ndt.example.test/ndt/v7/upload?');
     expect(result['///ndt/v7/download']).toContain('client_name=example-app');
     expect(result['///ndt/v7/download']).toContain(
-      'client_library_name=%40_molaidrislabs%2Freact-native-ndt7-js'
+      'client_library_name=%40_molaidrislabs%2Freact-native-internet-speed-test'
     );
   });
 

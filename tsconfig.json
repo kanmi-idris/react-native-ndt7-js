@@ -2,7 +2,7 @@
   "compilerOptions": {
     "rootDir": ".",
     "paths": {
-      "@_molaidrislabs/react-native-ndt7-js": ["./src/index"]
+      "@_molaidrislabs/react-native-internet-speed-test": ["./src/index"]
     },
     "allowUnreachableCode": false,
     "allowUnusedLabels": false,

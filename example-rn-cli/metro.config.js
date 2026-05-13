@@ -12,7 +12,7 @@ const config = {
       path.resolve(libraryRoot, 'node_modules'),
     ],
     extraNodeModules: {
-      'react-native-ndt7-js': libraryRoot,
+      '@_molaidrislabs/react-native-internet-speed-test': libraryRoot,
     },
   },
 };
